@@ -48,6 +48,15 @@ join a match already in progress. The host's browser keeps score; each player ru
 
 On-screen hints follow whichever device you touched last.
 
+### Phones and tablets
+
+Touch controls appear automatically on touch devices (landscape). Left thumb: a floating joystick (push to the
+edge to sprint). Right thumb: drag to look; the fire and scope buttons also turn the view while held.
+Every action has a button: fire, scope/block, jump, slide, dash, grapple (hold to reel), katana slash, reload,
+grenade (hold to throw further), weapon slots 1-4, scoreboard and pause. Sensitivity, button size/opacity, a fixed
+stick and a low-quality mode are in the settings panel. To try it on a phone on your wifi run
+`python3 serve.py 8910 0.0.0.0` and open `http://<your-pc-ip>:8910`. On iPhone use Share > Add to Home Screen for fullscreen.
+
 ## Weapons and gear
 
 Rifle, shotgun, sniper (with scope) and a katana. Holding block with the katana parries

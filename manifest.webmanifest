@@ -1,0 +1,9 @@
+{
+  "name": "涂鸦街区",
+  "short_name": "涂鸦街区",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#f6f3e6",
+  "theme_color": "#f6f3e6"
+}

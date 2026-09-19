@@ -40,8 +40,11 @@ export class HUD {
   }
   setGrenades(n) { if (n === this._nades) return; this._nades = n; let h = ''; for (let i = 0; i < n; i++) h += '<i></i>'; this.el.nades.innerHTML = h; }
   // control labels follow whatever you touched last
-  setDevice(pad) { if (pad === this._pad) return; this._pad = pad; this.root.classList.toggle('pad', pad); if (this.onDevice) this.onDevice(pad); }
-  key(action) { return (this._pad ? PAD_KEYS : KB_KEYS)[action] || action; }
+  setDevice(pad, touch = false) {
+    if (pad === this._pad && touch === this._touch) return; this._pad = pad; this._touch = touch;
+    this.root.classList.toggle('pad', pad); this.root.classList.toggle('touch', touch); document.body.classList.toggle('touch', touch); if (this.onDevice) this.onDevice(pad);
+  }
+  key(action) { return (this._touch ? TOUCH_KEYS : this._pad ? PAD_KEYS : KB_KEYS)[action] || action; }
   setScope(on) { if (on === this._scope) return; this._scope = on; this.el.scope.classList.toggle('on', on); }
   setFocusMark(x, y) {
     const m = this.el.focusmark;
@@ -91,6 +94,18 @@ export class HUD {
 
 export const KB_KEYS = { fire: 'LMB', aim: 'RMB', block: 'RMB', jump: 'Space', sprint: 'Shift', slide: 'C', dash: 'C', grapple: 'Q', melee: 'F', reload: 'R', grenade: 'G', focus: '左右键同按（或 X）', next: '滚轮', pause: 'Esc', confirm: 'Space', score: 'Tab' };
 export const PAD_KEYS = { fire: 'R2', aim: 'L2', block: 'L2', jump: '✕', sprint: 'L3', slide: '○', dash: '○', grapple: 'L1', melee: 'R1', reload: '□', grenade: 'R3', focus: 'L2 + R2', next: '△', pause: 'Options', confirm: '✕', score: 'Create' };
+export const TOUCH_KEYS = { fire: '开火键', aim: '开镜键', block: '格挡键', jump: '跳跃键', sprint: '摇杆推到底', slide: '滑铲键', dash: '冲刺键', grapple: '抓钩键', melee: '挥砍键', reload: '换弹键', grenade: '手雷键', focus: '冲刺键', next: '武器栏', pause: '暂停键', confirm: '点击屏幕', score: '计分键' };
+export const TOUCH_CONTROLS_HTML = `
+<div class="cols">
+  <div><div class="colhead">触屏</div>
+    <div><b>左侧摇杆</b> 移动（推到边缘 = 疾跑） &nbsp; <b>右侧拖动</b> 视角</div>
+    <div><b>开火</b> 开火 / 挥砍（按住拖动可边打边转视角） &nbsp; <b>开镜</b> 瞄准 / 格挡</div>
+    <div><b>跳跃</b>（贴墙再按 = 蹬墙跳，空中再按 = 二段跳） &nbsp; <b>滑铲</b> 滑铲 · 空中冲刺</div>
+    <div><b>抓钩</b> 点按摆荡，长按收绳，跳跃起飞 &nbsp; <b>冲刺</b> 空中冲刺 · 太刀能量满后冲刺斩</div>
+    <div><b>挥砍</b> 太刀快速挥砍 &nbsp; <b>换弹</b> &nbsp; <b>手雷</b> 按住可扔得更远</div>
+    <div><b>1-4</b> 步枪 · 霰弹枪 · 狙击枪 · 太刀 &nbsp; <b>计分</b> 计分板（联机） &nbsp; <b>暂停</b></div>
+  </div>
+</div>`;
 export const CONTROLS_HTML = `
 <div class="cols">
   <div><div class="colhead">鼠标 + 键盘</div>

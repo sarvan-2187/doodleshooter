@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { InkRenderer, INK, makeInkMaterial } from './render.js';
 import { World } from './physics.js';
 import { Input } from './input.js';
+import { Touch } from './touch.js';
 import { buildLevel, LEVELS } from './level.js';
 import { NavGrid } from './nav.js';
 import { Effects } from './effects.js';
@@ -12,7 +13,7 @@ import { EnemyManager, BOSSES } from './enemies.js';
 import { Player } from './player.js';
 import { RemotePlayer, encodeLocal } from './players.js';
 import { Net } from './net.js';
-import { HUD, CONTROLS_HTML } from './hud.js';
+import { HUD, CONTROLS_HTML, TOUCH_CONTROLS_HTML } from './hud.js';
 import { audio } from './audio.js';
 import { rand, choose, clamp } from './util.js';
 
@@ -39,6 +40,7 @@ const input = new Input(canvas);
 const hud = new HUD(document.getElementById('hud'));
 const effects = new Effects(R.scene, world);
 const ctx = { scene: R.scene, camera: R.camera, world, level, nav, input, hud, effects, audio, renderer: R };
+const controlsHTML = () => (input.usingTouch ? TOUCH_CONTROLS_HTML : CONTROLS_HTML);
 
 // ---------------- persistent bits ----------------
 let best = Number(localStorage.getItem('doodle_best') || 0);
@@ -599,6 +601,11 @@ function settingsHTML() {
     <label>鼠标灵敏度 <input type="range" id="setSens" min="25" max="250" step="5" value="${settings.sens}"><b id="setSensV">${settings.sens}%</b></label>
     <label><input type="checkbox" id="setInv" ${settings.invert ? 'checked' : ''}> 反转垂直视角</label>
     <label><input type="checkbox" id="setMus" ${musicWanted ? 'checked' : ''}> 音乐 <span class="k">(M)</span></label>
+    ${input.usingTouch ? `<label>触屏灵敏度 <input type="range" id="tSens" min="40" max="250" step="5" value="${touch.cfg.sens}"><b>${touch.cfg.sens}%</b></label>
+    <label>按键大小 <input type="range" id="tSize" min="70" max="140" step="5" value="${touch.cfg.size}"><b>${touch.cfg.size}%</b></label>
+    <label>按键透明度 <input type="range" id="tOpa" min="30" max="100" step="5" value="${touch.cfg.opacity}"><b>${touch.cfg.opacity}%</b></label>
+    <label><input type="checkbox" id="tFixed" ${touch.cfg.fixed ? 'checked' : ''}> 固定摇杆位置</label>
+    <label><input type="checkbox" id="tLow" ${touch.cfg.low ? 'checked' : ''}> 低画质（更流畅）</label>` : ''}
   </div>`;
 }
 function wireSettings() {
@@ -607,6 +614,12 @@ function wireSettings() {
   const sens = box.querySelector('#setSens'), out = box.querySelector('#setSensV');
   sens.addEventListener('input', () => { settings.sens = Number(sens.value); out.textContent = settings.sens + '%'; applySettings(); });
   box.querySelector('#setInv').addEventListener('change', (e) => { settings.invert = e.target.checked; applySettings(); });
+  for (const [id, key] of [['tSens', 'sens'], ['tSize', 'size'], ['tOpa', 'opacity']]) {
+    const r = box.querySelector('#' + id); if (r) r.addEventListener('input', () => { touch.cfg[key] = Number(r.value); r.nextElementSibling.textContent = r.value + '%'; touch.applyCfg(); });
+  }
+  for (const [id, key] of [['tFixed', 'fixed'], ['tLow', 'low']]) {
+    const c = box.querySelector('#' + id); if (c) c.addEventListener('change', () => { touch.cfg[key] = c.checked; touch.applyCfg(); applyQuality(); });
+  }
   box.querySelector('#setMus').addEventListener('change', (e) => { musicWanted = e.target.checked; localStorage.setItem('doodle_music', musicWanted ? '1' : '0'); audio.musicOn(musicWanted); });
 }
 function wireName(box) {
@@ -628,7 +641,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 function mainHTML() {
   return `<h1>涂鸦街区</h1><h2>一款涂鸦风生存射击游戏</h2>
     <div class="mainbtns"><button type="button" class="start" id="soloBtn">开始游戏<i>单人 · 抵御一波波敌人</i></button><button type="button" id="onlineBtn">在线对战<i>自由混战 · 最多 10 名玩家</i></button></div>
-    ${mapHTML(mapKey, true)}${CONTROLS_HTML}${settingsHTML()}${checkpointHTML()}${best ? `<div class="beststat">最高分：${best}</div>` : ''}`;
+    ${mapHTML(mapKey, true)}${controlsHTML()}${settingsHTML()}${checkpointHTML()}${best ? `<div class="beststat">最高分：${best}</div>` : ''}`;
 }
 function onlineHTML() {
   return `<h1>在线对战</h1><h2>自由混战 · 先到 ${FFA_TARGET} 杀 · 最多 10 名玩家</h2>
@@ -700,10 +713,10 @@ function showStart() {
 }
 function showPause() {
   if (online()) {
-    hud.showScreen(`<h1>菜单</h1><h2>自由混战 · 大厅 ${String(net.aliasCode || net.code || '').replace(/-\d+$/, '')}</h2><div class="scoreboard">${sortedScores().map(([id, s]) => `<div class="${id === net.id ? 'me' : ''}"><span>${esc(s.name)}</span><span>${s.kills} 杀 · ${s.deaths} 死</span></div>`).join('')}</div>${CONTROLS_HTML}${settingsHTML()}<div class="online" id="online"><div class="row"><button type="button" class="alt" id="leaveBtn">离开对战</button></div></div><div class="go">点击任意位置（或按 ${hud.key('confirm')}）继续游戏</div>`);
+    hud.showScreen(`<h1>菜单</h1><h2>自由混战 · 大厅 ${String(net.aliasCode || net.code || '').replace(/-\d+$/, '')}</h2><div class="scoreboard">${sortedScores().map(([id, s]) => `<div class="${id === net.id ? 'me' : ''}"><span>${esc(s.name)}</span><span>${s.kills} 杀 · ${s.deaths} 死</span></div>`).join('')}</div>${controlsHTML()}${settingsHTML()}<div class="online" id="online"><div class="row"><button type="button" class="alt" id="leaveBtn">离开对战</button></div></div><div class="go">点击任意位置（或按 ${hud.key('confirm')}）继续游戏</div>`);
     wireSettings(); wireOnline(); return;
   }
-  hud.showScreen(`<h1>已暂停</h1><h2>第 ${game.wave} 波 · 得分 ${game.score}</h2>${CONTROLS_HTML}${settingsHTML()}${menuBtnHTML()}<div class="go">点击任意位置（或按 ${hud.key('confirm')}）继续</div>`);
+  hud.showScreen(`<h1>已暂停</h1><h2>第 ${game.wave} 波 · 得分 ${game.score}</h2>${controlsHTML()}${settingsHTML()}${menuBtnHTML()}<div class="go">点击任意位置（或按 ${hud.key('confirm')}）继续</div>`);
   wireSettings(); wireMenuBtn();
 }
 function showClickToPlay() { hud.showScreen(`<h1>对战开始</h1><h2>自由混战 · 先到 ${FFA_TARGET} 杀</h2><div class="go">点击任意位置（或按 ${hud.key('confirm')}）开始作战</div>`); }
@@ -725,7 +738,7 @@ function resetGame() {
   player.reset(level.playerStart); player.name = myName; player.lastHitBy = null; player.lastHit = null; enemies.mods.speed = 1; enemies.mods.damage = 1; hud.setModifier(''); hud.setBoss(null, null); game.boss = null; endFocus(); game.katanaStreak = 0;
   game.score = 0; game.kills = 0; game.combo = 0; game.wave = 0; game.intermission = 0; game.queue = []; game.time = 0; game.over = null; game.matchT = 0; hud.setScore(0, 0); hud.setTimer(''); hud.setPvpScore(null); hud.setWave(1, 0); hud.setBoard(null);
 }
-function beginCommon() { audio.init(); audio.resume(); if (!input.usingGamepad) input.requestLock(); if (musicWanted && !audio.musicPlaying) audio.musicOn(true); hud.hideScreen(); hud.setGameplayVisible(true); game.menu = false; }
+function beginCommon() { audio.init(); audio.resume(); if (!input.noLock) input.requestLock(); if (musicWanted && !audio.musicPlaying) audio.musicOn(true); hud.hideScreen(); hud.setGameplayVisible(true); game.menu = false; }
 function begin() { game.mode = 'solo'; setArena(false); beginCommon(); if (game.state === 'start' || game.state === 'dead') { resetGame(); startWave(1); } game.state = 'play'; }
 function beginAtWave(n) { game.mode = 'solo'; setArena(false); beginCommon(); resetGame(); startWave(n); game.state = 'play'; }
 function jumpToWave(n) { enemies.clear(); effects.clear(); enemies.mods.speed = 1; enemies.mods.damage = 1; endFocus(); game.intermission = 0; game.queue = []; startWave(n); hud.hideScreen(); hud.setGameplayVisible(true); game.state = 'play'; game.menu = false; audio.reelLoop(false); }
@@ -745,26 +758,34 @@ function startMatch(late, spawnIdx) {
   refreshScoreHud(); hud.message('自由混战', late ? '你加入了一场进行中的对战' : '先到 ' + FFA_TARGET + ' 杀 · ' + Math.round(FFA_TIME / 60) + ' 分钟 · 人人都是目标', 3);
   hud.tip(`按住 <b>${hud.key('score')}</b> 查看计分板`, 5);
   // a match started by someone else's click cannot grab the mouse: ask for a click
-  setTimeout(() => { if (game.state === 'play' && !input.pointerLocked && !input.usingGamepad) { game.menu = true; showClickToPlay(); } }, 250);
+  setTimeout(() => { if (game.state === 'play' && !input.pointerLocked && !input.noLock) { game.menu = true; showClickToPlay(); } }, 250);
 }
 function pause() { if ((game.state !== 'play' && !(game.state === 'dying' && online())) || game.menu) return; if (!online()) game.state = 'pause'; game.menu = true; showPause(); audio.reelLoop(false); }
-function resume() { if (online()) { game.menu = false; if (game.state === 'dying' && game.respawnT <= 0) game.respawnArm = input.lastActive; hud.hideScreen(); hud.setGameplayVisible(true); if (!input.usingGamepad) input.requestLock(); return; } begin(); }
+function resume() { if (online()) { game.menu = false; if (game.state === 'dying' && game.respawnT <= 0) game.respawnArm = input.lastActive; hud.hideScreen(); hud.setGameplayVisible(true); if (!input.noLock) input.requestLock(); return; } begin(); }
 Object.assign(window.__game, { startWave, updateWaves, begin, beginAtWave, jumpToWave, resetGame, spawnPickup, focusCandidate, enterFocus, pickSpawn, startMatch, createLobby, joinLobby, quickPlay, leaveOnline, hostStart });
 hud.onScreenClick = () => {
-  const st = game.state;
+  const st = game.state; if (input.usingTouch) touch.fullscreen();
   if (st === 'over') { if (net.isHost) { net.send('backtolobby', {}); toLobbyScreen(); } return; }
   if (st === 'lobby') return;
   if (st === 'start') { if (screen === 'main') begin(); return; }
   if ((st === 'play' || st === 'dying') && game.menu) { resume(); return; }
   if (st === 'pause' || st === 'dead') resume();
 };
-canvas.addEventListener('click', () => { if (game.state === 'play' && !game.menu && !input.pointerLocked && !input.usingGamepad) input.requestLock(); });
-input.onLockChange = (locked) => { if (!locked && (game.state === 'play' || (game.state === 'dying' && online())) && !game.menu && !input.usingGamepad) pause(); };
-input.onDeviceChange = (pad) => { hud.setDevice(pad); hud.setWeapon(player.weapon.name, player.weapon.hint); };
+canvas.addEventListener('click', () => { if (game.state === 'play' && !game.menu && !input.pointerLocked && !input.noLock) input.requestLock(); });
+input.onLockChange = (locked) => { if (!locked && (game.state === 'play' || (game.state === 'dying' && online())) && !game.menu && !input.noLock) pause(); };
+input.onDeviceChange = (pad, touch) => { hud.setDevice(pad, !!touch); hud.setWeapon(player.weapon.name, player.weapon.hint); };
+const touch = new Touch(input, () => ({ weapon: player.weaponIndex, katana: player.weapon.kind === 'katana', dashReady: hud._fmReady, online: online() }));
+window.__game.touch = touch;
+// a phone that goes to the background or gets turned upright must not keep playing
+const touchPause = () => { if (input.usingTouch && game.state === 'play' && !game.menu) pause(); };
+document.addEventListener('visibilitychange', () => { if (document.hidden) touchPause(); });
+// touch phones render at 1x (0.75x on low quality): the outline/hatch post pass is the expensive part
+function applyQuality() { R.pixelRatio = input.usingTouch ? (touch.cfg.low ? 0.75 : Math.min(window.devicePixelRatio || 1, 1)) : Math.min(window.devicePixelRatio || 1, 1.5); R.resize(); }
+applyQuality(); const onDev = input.onDeviceChange; input.onDeviceChange = (pad, t) => { onDev(pad, t); applyQuality(); };
 window.addEventListener('pagehide', () => { if (net.active) net.leave(); });
 // browsers only let audio start on a gesture; any press wakes the context if it went to sleep
 for (const ev of ['pointerdown', 'keydown']) window.addEventListener(ev, () => { audio.init(); audio.resume(); }, { passive: true });
-hud.setDevice(input.usingGamepad); applySettings(); hud.setWeapon(player.weapon.name, player.weapon.hint); showStart();
+hud.setDevice(input.usingGamepad, input.usingTouch); applySettings(); hud.setWeapon(player.weapon.name, player.weapon.hint); showStart();
 
 // ---------------- loop ----------------
 let last = performance.now(), boardToggle = false, lockTipT = 0.5, musicHealT = 2;
@@ -777,15 +798,17 @@ function step(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   input.update(dt);
   const st = game.state; const playing = st === 'play' || st === 'dying';
+  touch.update(input.usingTouch && playing && !game.menu);
+  if (input.usingTouch && st === 'play' && !game.menu && innerHeight > innerWidth) touchPause();
   if (st === 'start' || st === 'pause' || st === 'dead' || st === 'over') { if (input.pressed('jump') || input.pressed('confirm') || (st === 'pause' && input.pressed('pause'))) hud.onScreenClick(); }
   else if ((st === 'play' || (st === 'dying' && online())) && input.pressed('pause')) { if (game.menu) resume(); else { pause(); input.exitLock(); } }
   else if ((st === 'play' || st === 'dying') && game.menu && (input.pressed('jump') || input.pressed('confirm'))) resume();
   if (input.pressed('music')) { musicWanted = !musicWanted; localStorage.setItem('doodle_music', musicWanted ? '1' : '0'); audio.musicOn(musicWanted); hud.tip(musicWanted ? '音乐已开启' : '音乐已关闭', 1.5); }
   if (online() && playing) {
-    if (input.usingGamepad && input.pressed('score')) boardToggle = !boardToggle;
-    const want = ((input.down('score') && !input.usingGamepad) || boardToggle) && !game.menu; if (want !== !hud.el.board.hidden) hud.setBoard(want ? boardHTML() : null);
+    if (input.noLock && input.pressed('score')) boardToggle = !boardToggle;
+    const want = ((input.down('score') && !input.noLock) || boardToggle) && !game.menu; if (want !== !hud.el.board.hidden) hud.setBoard(want ? boardHTML() : null);
   } else boardToggle = false;
-  if (st === 'play' && !game.menu && !input.pointerLocked && !input.usingGamepad) { lockTipT -= dt; if (lockTipT <= 0) { lockTipT = 2.5; hud.tip('点击画面以锁定鼠标', 2); } }
+  if (st === 'play' && !game.menu && !input.pointerLocked && !input.noLock) { lockTipT -= dt; if (lockTipT <= 0) { lockTipT = 2.5; hud.tip('点击画面以锁定鼠标', 2); } }
   let scale = 1;
   if (game.hitstopT > 0) { game.hitstopT -= dt; scale = game.hitstopScale; }
   else if (game.focus.active) scale = FOCUS_SCALE;
