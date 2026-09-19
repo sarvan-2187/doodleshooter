@@ -601,10 +601,11 @@ function settingsHTML() {
     <label>look sensitivity <input type="range" id="setSens" min="25" max="250" step="5" value="${settings.sens}"><b id="setSensV">${settings.sens}%</b></label>
     <label><input type="checkbox" id="setInv" ${settings.invert ? 'checked' : ''}> invert vertical look</label>
     <label><input type="checkbox" id="setMus" ${musicWanted ? 'checked' : ''}> music <span class="k">(M)</span></label>
-    ${input.usingTouch ? `<label>touch sensitivity <input type="range" id="tSens" min="40" max="250" step="5" value="${touch.cfg.sens}"><b>${touch.cfg.sens}%</b></label>
+    ${input.usingTouch ? `<label>touch sensitivity <input type="range" id="tSens" min="40" max="400" step="5" value="${touch.cfg.sens}"><b>${touch.cfg.sens}%</b></label>
     <label>button size <input type="range" id="tSize" min="70" max="140" step="5" value="${touch.cfg.size}"><b>${touch.cfg.size}%</b></label>
     <label>button opacity <input type="range" id="tOpa" min="30" max="100" step="5" value="${touch.cfg.opacity}"><b>${touch.cfg.opacity}%</b></label>
     <label><input type="checkbox" id="tFixed" ${touch.cfg.fixed ? 'checked' : ''}> fixed joystick position</label>
+    <label><button type="button" id="tCustom">Customize buttons</button></label>
     <label><input type="checkbox" id="tLow" ${touch.cfg.low ? 'checked' : ''}> low quality (smoother)</label>` : ''}
   </div>`;
 }
@@ -617,6 +618,7 @@ function wireSettings() {
   for (const [id, key] of [['tSens', 'sens'], ['tSize', 'size'], ['tOpa', 'opacity']]) {
     const r = box.querySelector('#' + id); if (r) r.addEventListener('input', () => { touch.cfg[key] = Number(r.value); r.nextElementSibling.textContent = r.value + '%'; touch.applyCfg(); });
   }
+  const cust = box.querySelector('#tCustom'); if (cust) cust.addEventListener('click', () => touch.openEditor());
   for (const [id, key] of [['tFixed', 'fixed'], ['tLow', 'low']]) {
     const c = box.querySelector('#' + id); if (c) c.addEventListener('change', () => { touch.cfg[key] = c.checked; touch.applyCfg(); applyQuality(); });
   }
